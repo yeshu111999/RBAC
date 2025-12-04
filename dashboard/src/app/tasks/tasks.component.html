@@ -1,0 +1,684 @@
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900 dark:text-gray-100">
+    <!-- Header -->
+    <header
+      class="flex items-center justify-between px-6 py-4 bg-white dark:bg-gray-800 shadow"
+    >
+      <div>
+        <h1 class="text-xl font-semibold">Task Board</h1>
+        <p *ngIf="currentUser" class="text-xs text-gray-500 dark:text-gray-300">
+          Logged in as: {{ currentUser.email }} ({{ currentUser.role }})
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <!-- Dark mode toggle -->
+        <button
+          (click)="toggleDarkMode()"
+          class="text-xs px-3 py-1 rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+        >
+          {{ isDarkMode ? '☀️ Light' : '🌙 Dark' }}
+        </button>
+        <button
+          (click)="goToProfile()"
+          class="text-sm px-3 py-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+        >
+          Profile
+        </button>
+        <button
+          (click)="logout()"
+          class="text-sm px-3 py-1 rounded bg-red-500 text-white hover:bg-red-600"
+        >
+          Logout
+        </button>
+      </div>
+    </header>
+  
+    <main class="max-w-6xl mx-auto p-6 space-y-6">
+      <!-- Error -->
+      <p *ngIf="error" class="text-red-500 text-sm">
+        {{ error }}
+      </p>
+  
+      <!-- Keyboard shortcut hint -->
+      <div
+        class="text-xs text-gray-500 dark:text-gray-300 flex flex-wrap gap-2 items-center"
+      >
+        <span class="font-semibold">Shortcuts:</span>
+        <span>Ctrl/Cmd + N → Focus "New Task"</span>
+        <span>Ctrl/Cmd + D → Toggle dark mode</span>
+      </div>
+  
+      <!-- Task completion visualization -->
+      <section
+        class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow space-y-3"
+      >
+        <div class="flex justify-between items-center">
+          <h2 class="text-sm font-semibold">
+            Task Completion Overview
+          </h2>
+          <p class="text-xs text-gray-500 dark:text-gray-300">
+            Total: {{ totalTasks }} · Done: {{ doneCount }}
+            ({{ donePercent }}%)
+          </p>
+        </div>
+  
+        <div class="w-full h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+          <div
+            class="h-full bg-blue-400"
+            [style.width.%]="todoPercent"
+            *ngIf="todoPercent > 0"
+          ></div>
+          <div
+            class="h-full bg-yellow-400"
+            [style.width.%]="inProgressPercent"
+            *ngIf="inProgressPercent > 0"
+          ></div>
+          <div
+            class="h-full bg-green-500"
+            [style.width.%]="donePercent"
+            *ngIf="donePercent > 0"
+          ></div>
+        </div>
+  
+        <div class="flex flex-wrap gap-4 text-[11px] mt-1">
+          <span class="flex items-center gap-1">
+            <span class="inline-block w-3 h-3 rounded bg-blue-400"></span>
+            TODO: {{ todoCount }} ({{ todoPercent }}%)
+          </span>
+          <span class="flex items-center gap-1">
+            <span
+              class="inline-block w-3 h-3 rounded bg-yellow-400"
+            ></span>
+            In Progress: {{ inProgressCount }}
+            ({{ inProgressPercent }}%)
+          </span>
+          <span class="flex items-center gap-1">
+            <span
+              class="inline-block w-3 h-3 rounded bg-green-500"
+            ></span>
+            Done: {{ doneCount }} ({{ donePercent }}%)
+          </span>
+        </div>
+      </section>
+  
+      <!-- Create Task (OWNER / ADMIN) -->
+      <section
+        *ngIf="canManageTasks"
+        class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow space-y-4"
+      >
+        <h2 class="text-lg font-semibold">Create Task</h2>
+        <div class="grid gap-4 md:grid-cols-4">
+          <input
+            #newTitleInput
+            type="text"
+            [(ngModel)]="newTitle"
+            name="title"
+            placeholder="Title"
+            class="border rounded px-3 py-2 md:col-span-1 bg-white dark:bg-gray-900 dark:border-gray-700"
+          />
+          <input
+            type="text"
+            [(ngModel)]="newDescription"
+            name="description"
+            placeholder="Description"
+            class="border rounded px-3 py-2 md:col-span-1 bg-white dark:bg-gray-900 dark:border-gray-700"
+          />
+          <select
+            [(ngModel)]="newCategory"
+            name="category"
+            class="border rounded px-3 py-2 md:col-span-1 bg-white dark:bg-gray-900 dark:border-gray-700"
+          >
+            <option value="WORK">Work</option>
+            <option value="PERSONAL">Personal</option>
+            <option value="OTHER">Other</option>
+          </select>
+          <select
+            [(ngModel)]="selectedAssigneeId"
+            name="selectedAssigneeId"
+            class="border rounded px-3 py-2 md:col-span-1 bg-white dark:bg-gray-900 dark:border-gray-700"
+          >
+            <option [ngValue]="null">Unassigned</option>
+            <option
+              *ngFor="let u of allUsers"
+              [ngValue]="u.id"
+            >
+              {{ u.name || u.email }} ({{ u.role }})
+            </option>
+          </select>
+        </div>
+        <button
+          (click)="createTask()"
+          class="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          Add Task
+        </button>
+      </section>
+  
+      <!-- OWNER ONLY: User Management -->
+      <section
+        *ngIf="currentUser?.role === 'OWNER'"
+        class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow space-y-4"
+      >
+        <h2 class="text-lg font-semibold">
+          User Management (Owner only)
+        </h2>
+        <p class="text-sm text-gray-500 dark:text-gray-300">
+          Create new user accounts with Admin/Viewer roles. A random password
+          will be generated and shown once so you can copy and share manually.
+        </p>
+  
+        <div class="grid gap-4 md:grid-cols-4">
+          <input
+            type="email"
+            [(ngModel)]="newUserEmail"
+            name="newUserEmail"
+            placeholder="New user email"
+            class="border rounded px-3 py-2 bg-white dark:bg-gray-900 dark:border-gray-700"
+          />
+  
+          <input
+            type="text"
+            [(ngModel)]="newUserName"
+            name="newUserName"
+            placeholder="Full name"
+            class="border rounded px-3 py-2 bg-white dark:bg-gray-900 dark:border-gray-700"
+          />
+  
+          <select
+            [(ngModel)]="newUserRole"
+            name="newUserRole"
+            class="border rounded px-3 py-2 bg-white dark:bg-gray-900 dark:border-gray-700"
+          >
+            <option value="ADMIN">Admin</option>
+            <option value="VIEWER">Viewer</option>
+          </select>
+  
+          <button
+            (click)="createUserAccount()"
+            class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          >
+            Create User
+          </button>
+        </div>
+      </section>
+  
+      <!-- Filters & sorting -->
+      <section
+        class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow flex flex-wrap gap-4"
+      >
+        <div>
+          <label
+            class="block text-xs font-semibold text-gray-600 dark:text-gray-300"
+          >
+            Category
+          </label>
+          <select
+            [(ngModel)]="filterCategory"
+            (ngModelChange)="onFiltersChanged()"
+            class="border rounded px-3 py-1 text-sm bg-white dark:bg-gray-900 dark:border-gray-700"
+            name="filterCategory"
+          >
+            <option value="ALL">All</option>
+            <option value="WORK">Work</option>
+            <option value="PERSONAL">Personal</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </div>
+  
+        <div>
+          <label
+            class="block text-xs font-semibold text-gray-600 dark:text-gray-300"
+          >
+            Sort by
+          </label>
+          <select
+            [(ngModel)]="sortBy"
+            (ngModelChange)="onFiltersChanged()"
+            class="border rounded px-3 py-1 text-sm bg-white dark:bg-gray-900 dark:border-gray-700"
+            name="sortBy"
+          >
+            <option value="createdAt">Created (newest first)</option>
+            <option value="title">Title (A → Z)</option>
+          </select>
+        </div>
+  
+        <div class="flex items-center gap-2">
+          <input
+            type="checkbox"
+            [(ngModel)]="showOnlyMine"
+            (ngModelChange)="onFiltersChanged()"
+            id="showOnlyMine"
+            class="h-4 w-4"
+            name="showOnlyMine"
+          />
+          <label
+            for="showOnlyMine"
+            class="text-xs font-semibold text-gray-600 dark:text-gray-300"
+          >
+            Show only my tasks
+          </label>
+        </div>
+      </section>
+  
+      <!-- Loading -->
+      <p *ngIf="loading" class="text-gray-500 text-sm">
+        Loading tasks...
+      </p>
+  
+      <!-- Kanban Board with drag & drop -->
+      <section *ngIf="!loading" class="grid gap-4 md:grid-cols-3">
+        <!-- TODO Column -->
+        <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-3">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold">TODO</h3>
+            <span class="text-xs text-gray-500">
+              {{ todoColumn.length }} tasks
+            </span>
+          </div>
+          <div
+            cdkDropList
+            [cdkDropListData]="todoColumn"
+            (cdkDropListDropped)="drop($event, 'TODO')"
+            class="space-y-2 min-h-[50px]"
+          >
+            <div
+              *ngFor="let task of todoColumn"
+              cdkDrag
+              class="bg-white dark:bg-gray-900 rounded-lg p-3 shadow-sm border border-gray-200 dark:border-gray-700"
+            >
+              <div class="flex justify-between items-start">
+                <div class="pr-2">
+                  <h4 class="font-semibold text-sm">
+                    {{ task.title }}
+                  </h4>
+                  <p
+                    *ngIf="task.description"
+                    class="text-xs text-gray-600 dark:text-gray-300 mt-1"
+                  >
+                    {{ task.description }}
+                  </p>
+                  <p class="text-[11px] text-gray-500 mt-1">
+                    Category: {{ task.category }}
+                  </p>
+                  <p class="text-[11px] text-gray-500">
+                    Assigned:
+                    {{ displayUserShort(task.assignedTo || null) }}
+                  </p>
+                </div>
+  
+                <div
+                  *ngIf="canManageTasks"
+                  class="flex flex-col items-end gap-1"
+                >
+                  <select
+                    class="border rounded px-1 py-1 text-[11px] bg-white dark:bg-gray-900 dark:border-gray-700"
+                    [ngModel]="task.assignedTo?.id || null"
+                    (ngModelChange)="reassignTask(task, $event)"
+                  >
+                    <option [ngValue]="null">Unassigned</option>
+                    <option
+                      *ngFor="let u of allUsers"
+                      [ngValue]="u.id"
+                    >
+                      {{ u.name || u.email }}
+                    </option>
+                  </select>
+                  <button
+                    (click)="openEditModal(task)"
+                    class="text-[11px] px-2 py-1 rounded bg-yellow-100 hover:bg-yellow-200"
+                  >
+                    Edit
+                  </button>
+                </div>
+              </div>
+  
+              <div
+                *ngIf="canManageTasks"
+                class="flex gap-1 mt-2"
+              >
+                <button
+                  (click)="updateStatus(task, 'IN_PROGRESS')"
+                  class="px-2 py-1 text-[11px] rounded bg-blue-100 hover:bg-blue-200"
+                >
+                  Move to In Progress
+                </button>
+                <button
+                  (click)="deleteTask(task)"
+                  class="px-2 py-1 text-[11px] rounded bg-red-100 text-red-700 hover:bg-red-200"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+  
+            <p
+              *ngIf="todoColumn.length === 0"
+              class="text-xs text-gray-400"
+            >
+              No tasks in TODO
+            </p>
+          </div>
+        </div>
+  
+        <!-- IN PROGRESS Column -->
+        <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-3">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold">In Progress</h3>
+            <span class="text-xs text-gray-500">
+              {{ inProgressColumn.length }} tasks
+            </span>
+          </div>
+          <div
+            cdkDropList
+            [cdkDropListData]="inProgressColumn"
+            (cdkDropListDropped)="drop($event, 'IN_PROGRESS')"
+            class="space-y-2 min-h-[50px]"
+          >
+            <div
+              *ngFor="let task of inProgressColumn"
+              cdkDrag
+              class="bg-white dark:bg-gray-900 rounded-lg p-3 shadow-sm border border-gray-200 dark:border-gray-700"
+            >
+              <div class="flex justify-between items-start">
+                <div class="pr-2">
+                  <h4 class="font-semibold text-sm">
+                    {{ task.title }}
+                  </h4>
+                  <p
+                    *ngIf="task.description"
+                    class="text-xs text-gray-600 dark:text-gray-300 mt-1"
+                  >
+                    {{ task.description }}
+                  </p>
+                  <p class="text-[11px] text-gray-500 mt-1">
+                    Category: {{ task.category }}
+                  </p>
+                  <p class="text-[11px] text-gray-500">
+                    Assigned:
+                    {{ displayUserShort(task.assignedTo || null) }}
+                  </p>
+                </div>
+  
+                <div
+                  *ngIf="canManageTasks"
+                  class="flex flex-col items-end gap-1"
+                >
+                  <select
+                    class="border rounded px-1 py-1 text-[11px] bg-white dark:bg-gray-900 dark:border-gray-700"
+                    [ngModel]="task.assignedTo?.id || null"
+                    (ngModelChange)="reassignTask(task, $event)"
+                  >
+                    <option [ngValue]="null">Unassigned</option>
+                    <option
+                      *ngFor="let u of allUsers"
+                      [ngValue]="u.id"
+                    >
+                      {{ u.name || u.email }}
+                    </option>
+                  </select>
+                  <button
+                    (click)="openEditModal(task)"
+                    class="text-[11px] px-2 py-1 rounded bg-yellow-100 hover:bg-yellow-200"
+                  >
+                    Edit
+                  </button>
+                </div>
+              </div>
+  
+              <div
+                *ngIf="canManageTasks"
+                class="flex gap-1 mt-2"
+              >
+                <button
+                  (click)="updateStatus(task, 'TODO')"
+                  class="px-2 py-1 text-[11px] rounded bg-gray-100 hover:bg-gray-200"
+                >
+                  Move to TODO
+                </button>
+                <button
+                  (click)="updateStatus(task, 'DONE')"
+                  class="px-2 py-1 text-[11px] rounded bg-green-100 hover:bg-green-200"
+                >
+                  Move to Done
+                </button>
+              </div>
+            </div>
+  
+            <p
+              *ngIf="inProgressColumn.length === 0"
+              class="text-xs text-gray-400"
+            >
+              No tasks in progress
+            </p>
+          </div>
+        </div>
+  
+        <!-- DONE Column -->
+        <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-3">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold">Done</h3>
+            <span class="text-xs text-gray-500">
+              {{ doneColumn.length }} tasks
+            </span>
+          </div>
+          <div
+            cdkDropList
+            [cdkDropListData]="doneColumn"
+            (cdkDropListDropped)="drop($event, 'DONE')"
+            class="space-y-2 min-h-[50px]"
+          >
+            <div
+              *ngFor="let task of doneColumn"
+              cdkDrag
+              class="bg-white dark:bg-gray-900 rounded-lg p-3 shadow-sm border border-gray-200 dark:border-gray-700"
+            >
+              <div class="flex justify-between items-start">
+                <div class="pr-2">
+                  <h4 class="font-semibold text-sm">
+                    {{ task.title }}
+                  </h4>
+                  <p
+                    *ngIf="task.description"
+                    class="text-xs text-gray-600 dark:text-gray-300 mt-1"
+                  >
+                    {{ task.description }}
+                  </p>
+                  <p class="text-[11px] text-gray-500 mt-1">
+                    Category: {{ task.category }}
+                  </p>
+                  <p class="text-[11px] text-gray-500">
+                    Assigned:
+                    {{ displayUserShort(task.assignedTo || null) }}
+                  </p>
+                </div>
+  
+                <div
+                  *ngIf="canManageTasks"
+                  class="flex flex-col items-end gap-1"
+                >
+                  <select
+                    class="border rounded px-1 py-1 text-[11px] bg-white dark:bg-gray-900 dark:border-gray-700"
+                    [ngModel]="task.assignedTo?.id || null"
+                    (ngModelChange)="reassignTask(task, $event)"
+                  >
+                    <option [ngValue]="null">Unassigned</option>
+                    <option
+                      *ngFor="let u of allUsers"
+                      [ngValue]="u.id"
+                    >
+                      {{ u.name || u.email }}
+                    </option>
+                  </select>
+                  <button
+                    (click)="openEditModal(task)"
+                    class="text-[11px] px-2 py-1 rounded bg-yellow-100 hover:bg-yellow-200"
+                  >
+                    Edit
+                  </button>
+                </div>
+              </div>
+  
+              <div
+                *ngIf="canManageTasks"
+                class="flex gap-1 mt-2"
+              >
+                <button
+                  (click)="updateStatus(task, 'IN_PROGRESS')"
+                  class="px-2 py-1 text-[11px] rounded bg-blue-100 hover:bg-blue-200"
+                >
+                  Move to In Progress
+                </button>
+              </div>
+            </div>
+  
+            <p
+              *ngIf="doneColumn.length === 0"
+              class="text-xs text-gray-400"
+            >
+              No tasks done yet
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
+  
+    <!-- Modal: created user credentials -->
+    <div
+      *ngIf="showUserCreatedModal"
+      class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-30"
+    >
+      <div
+        class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md"
+      >
+        <h3 class="text-lg font-semibold mb-2">User Created</h3>
+        <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">
+          Share these credentials with the new user. The password is shown only
+          once.
+        </p>
+        <div class="space-y-2 text-sm">
+          <p>
+            <span class="font-semibold">Email:</span>
+            {{ createdUserEmail }}
+          </p>
+          <p>
+            <span class="font-semibold">Password:</span>
+            {{ createdUserPassword }}
+          </p>
+        </div>
+  
+        <div class="flex justify-end gap-2 mt-4">
+          <button
+            (click)="copyCredentials()"
+            class="px-3 py-1 rounded bg-blue-600 text-white text-sm hover:bg-blue-700"
+          >
+            Copy
+          </button>
+          <button
+            (click)="closeUserCreatedModal()"
+            class="px-3 py-1 rounded bg-gray-200 dark:bg-gray-700 text-sm hover:bg-gray-300 dark:hover:bg-gray-600"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  
+    <!-- Modal: Edit Task -->
+    <div
+      *ngIf="editModalOpen"
+      class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-40"
+    >
+      <div
+        class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-lg"
+      >
+        <h3 class="text-lg font-semibold mb-4">
+          Edit Task
+        </h3>
+  
+        <div class="space-y-3">
+          <div>
+            <label
+              class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1"
+            >
+              Title
+            </label>
+            <input
+              type="text"
+              [(ngModel)]="editTitle"
+              name="editTitle"
+              class="border rounded px-3 py-2 w-full bg-white dark:bg-gray-900 dark:border-gray-700"
+            />
+          </div>
+  
+          <div>
+            <label
+              class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1"
+            >
+              Description
+            </label>
+            <textarea
+              [(ngModel)]="editDescription"
+              name="editDescription"
+              rows="3"
+              class="border rounded px-3 py-2 w-full bg-white dark:bg-gray-900 dark:border-gray-700"
+            ></textarea>
+          </div>
+  
+          <div class="grid gap-3 md:grid-cols-2">
+            <div>
+              <label
+                class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1"
+              >
+                Category
+              </label>
+              <select
+                [(ngModel)]="editCategory"
+                name="editCategory"
+                class="border rounded px-3 py-2 w-full bg-white dark:bg-gray-900 dark:border-gray-700"
+              >
+                <option value="WORK">Work</option>
+                <option value="PERSONAL">Personal</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </div>
+  
+            <div>
+              <label
+                class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1"
+              >
+                Assignee
+              </label>
+              <select
+                [(ngModel)]="editAssigneeId"
+                name="editAssigneeId"
+                class="border rounded px-3 py-2 w-full bg-white dark:bg-gray-900 dark:border-gray-700"
+              >
+                <option [ngValue]="null">Unassigned</option>
+                <option
+                  *ngFor="let u of allUsers"
+                  [ngValue]="u.id"
+                >
+                  {{ u.name || u.email }} ({{ u.role }})
+                </option>
+              </select>
+            </div>
+          </div>
+        </div>
+  
+        <div class="flex justify-end gap-2 mt-6">
+          <button
+            (click)="closeEditModal()"
+            class="px-3 py-1 rounded bg-gray-200 dark:bg-gray-700 text-sm hover:bg-gray-300 dark:hover:bg-gray-600"
+          >
+            Cancel
+          </button>
+          <button
+            (click)="saveEditChanges()"
+            class="px-4 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700"
+          >
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  

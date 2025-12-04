@@ -1,0 +1,92 @@
+<div class="min-h-screen bg-gray-50 flex justify-center pt-10">
+    <div class="bg-white rounded-xl shadow-lg p-6 w-full max-w-lg">
+      <div class="flex items-center justify-between mb-4">
+        <h1 class="text-xl font-semibold">Profile</h1>
+        <button
+          (click)="backToDashboard()"
+          class="text-xs px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
+        >
+          Back to Dashboard
+        </button>
+      </div>
+  
+      <p *ngIf="loading" class="text-sm text-gray-500 mb-4">
+        Loading profile...
+      </p>
+  
+      <div *ngIf="user">
+        <div class="mb-4">
+          <p class="text-sm text-gray-600">
+            <span class="font-semibold">Email:</span> {{ user.email }}
+          </p>
+          <p class="text-sm text-gray-600">
+            <span class="font-semibold">Full name:</span>
+            {{ user.name || '—' }}
+          </p>
+          <p class="text-sm text-gray-600">
+            <span class="font-semibold">Role:</span> {{ user.role }}
+          </p>
+        </div>
+  
+        <hr class="my-4" />
+  
+        <h2 class="text-lg font-semibold mb-2">Change Password</h2>
+  
+        <p *ngIf="error" class="text-sm text-red-600 mb-2">
+          {{ error }}
+        </p>
+        <p *ngIf="success" class="text-sm text-green-600 mb-2">
+          {{ success }}
+        </p>
+  
+        <form (ngSubmit)="changePassword()" class="space-y-3">
+          <div>
+            <label class="block text-sm font-medium mb-1">
+              Current password
+            </label>
+            <input
+              type="password"
+              [(ngModel)]="currentPassword"
+              name="currentPassword"
+              class="w-full border rounded px-3 py-2"
+              required
+            />
+          </div>
+  
+          <div>
+            <label class="block text-sm font-medium mb-1">
+              New password
+            </label>
+            <input
+              type="password"
+              [(ngModel)]="newPassword"
+              name="newPassword"
+              class="w-full border rounded px-3 py-2"
+              required
+            />
+          </div>
+  
+          <div>
+            <label class="block text-sm font-medium mb-1">
+              Confirm new password
+            </label>
+            <input
+              type="password"
+              [(ngModel)]="confirmPassword"
+              name="confirmPassword"
+              class="w-full border rounded px-3 py-2"
+              required
+            />
+          </div>
+  
+          <button
+            type="submit"
+            class="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Update Password
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+  

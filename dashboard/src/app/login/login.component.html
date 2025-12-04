@@ -1,0 +1,49 @@
+<div class="min-h-screen flex items-center justify-center bg-gray-100">
+    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
+      <h1 class="text-2xl font-bold text-center mb-6">Login</h1>
+  
+      <form (ngSubmit)="login()" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">Email</label>
+          <input
+            type="email"
+            [(ngModel)]="email"
+            name="email"
+            class="w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-300"
+            placeholder="owner@example.com"
+            required
+          />
+        </div>
+  
+        <div>
+          <label class="block text-sm font-medium mb-1">Password</label>
+          <input
+            type="password"
+            [(ngModel)]="password"
+            name="password"
+            class="w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-300"
+            placeholder="password123"
+            required
+          />
+        </div>
+  
+        <button
+          type="submit"
+          [disabled]="loading"
+          class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+        >
+          <span *ngIf="!loading">Login</span>
+          <span *ngIf="loading">Logging in...</span>
+        </button>
+  
+        <p class="text-xs text-gray-500 mt-2">
+            Test: <strong>owner&#64;example.com / password123</strong>
+        </p>
+  
+        <p *ngIf="error" class="text-sm text-red-600 mt-2">
+          {{ error }}
+        </p>
+      </form>
+    </div>
+  </div>
+  
